@@ -1,8 +1,8 @@
 #include <iostream>
 #include <blt/math/matrix.h>
 #include <blt/math/log_util.h>
-#include <valarray>
 #include "blt/std/assert.h"
+#include <blt/format/boxing.h>
 
 void test_math()
 {
@@ -23,18 +23,96 @@ constexpr blt::u32 output_count = 4;
 
 using input_t = blt::generalized_matrix<float, 1, input_count>;
 using output_t = blt::generalized_matrix<float, 1, output_count>;
+using crosstalk_t = blt::generalized_matrix<float, 1, output_count>;
+
+float crosstalk(const input_t& i, const input_t& j)
+{
+    return i * j.transpose();
+}
 
 input_t input_1{-1, 1, 1, 1, -1};
+input_t input_2{-1, -1, -1, -1, 1};
+input_t input_3{-1, -1, -1, 1, 1};
+input_t input_4{1, 1, 1, 1, 1};
+
 output_t output_1{1, 1, -1, 1};
+output_t output_2{1, -1, -1, -1};
+output_t output_3{-1, -1, 1, 1};
+output_t output_4{-1, 1, 1, -1};
+
+auto weight_1 = input_1.transpose() * output_1;
+auto weight_2 = input_2.transpose() * output_2;
+auto weight_3 = input_3.transpose() * output_3;
+auto weight_4 = input_4.transpose() * output_4;
+
+auto inputs = std::array{input_1, input_2, input_3, input_4};
+auto outputs = std::array{output_1, output_2, output_3, output_4};
+auto weights = std::array{weight_1, weight_2, weight_3, weight_4};
+
+auto weight_total_a = weight_1 + weight_2 + weight_3;
+auto weight_total_c = weight_total_a + weight_4;
+
+crosstalk_t crosstalk_values{};
+
+template<typename T, blt::u32 rows, blt::u32 columns>
+blt::generalized_matrix<T, rows, columns> normalize(const blt::generalized_matrix<T, rows, columns>& in)
+{
+    blt::generalized_matrix<T, rows, columns> result;
+    for (blt::u32 i = 0; i < columns; i++)
+    {
+        for (blt::u32 j = 0; j < rows; j++)
+            result[i][j] = in[i][j] >= 0 ? 1 : -1;
+    }
+    return result;
+}
+
+void test_recall(blt::size_t index)
+{
+    auto& input = inputs[index];
+    auto& output = outputs[index];
+    auto& associated_weights = weights[index];
+    
+    auto output_recall = normalize(input * associated_weights);
+    auto input_recall = normalize(output * associated_weights.transpose());
+    
+    if (output_recall != output)
+    {
+        BLT_ERROR_STREAM << "Output recalled failed!" << "\n";
+        BLT_ERROR_STREAM << "Expected: " << output << "\n";
+        BLT_ERROR_STREAM << "Found: " << output_recall << "\n";
+    } else
+        BLT_INFO("Output %ld recall passed!", index + 1);
+    
+    if (input_recall != input)
+    {
+        BLT_ERROR_STREAM << "Input recalled failed!" << "\n";
+        BLT_ERROR_STREAM << "Expected: " << input << "\n";
+        BLT_ERROR_STREAM << "Found: " << input_recall << "\n";
+    } else
+        BLT_INFO("Input %ld recall passed!", index + 1);
+}
+
+void part_a()
+{
+    blt::log_box_t box(BLT_INFO_STREAM, "Part A", 8);
+    test_recall(0);
+    test_recall(1);
+    test_recall(2);
+}
+
+void part_b()
+{
+    blt::log_box_t box(BLT_INFO_STREAM, "Part B", 8);
+    for (blt::u32 i = 0; i < output_count; i++)
+    {
+    
+    }
+}
 
 int main()
 {
     test_math();
     
-    
-    
-    std::cout << output_1 << std::endl;
-    std::cout << input_1.transpose() << std::endl;
-    std::cout << input_1.transpose() * output_1 << std::endl;
-    std::cout << "Hello World!" << std::endl;
+    part_a();
+    part_b();
 }
