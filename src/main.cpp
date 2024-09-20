@@ -18,12 +18,13 @@ void test_math()
     BLT_ASSERT(w_matrix == expected && "MATH FAILURE");
 }
 
+constexpr blt::u32 num_values = 4;
 constexpr blt::u32 input_count = 5;
 constexpr blt::u32 output_count = 4;
 
 using input_t = blt::generalized_matrix<float, 1, input_count>;
 using output_t = blt::generalized_matrix<float, 1, output_count>;
-using crosstalk_t = blt::generalized_matrix<float, 1, output_count>;
+using crosstalk_t = blt::generalized_matrix<float, output_count, num_values>;
 
 float crosstalk(const input_t& i, const input_t& j)
 {
@@ -103,9 +104,20 @@ void part_a()
 void part_b()
 {
     blt::log_box_t box(BLT_INFO_STREAM, "Part B", 8);
-    for (blt::u32 i = 0; i < output_count; i++)
+    for (blt::u32 i = 0; i < num_values; i++)
     {
-    
+        blt::generalized_matrix<float, 1, output_count> accum;
+        for (blt::u32 k = 0; k < num_values; k++)
+        {
+            if (i == k)
+                continue;
+            accum += (outputs[k] * crosstalk(inputs[k].normalize(), inputs[i].normalize()));
+        }
+        crosstalk_values.assign_to_column_from_column_rows(accum, i);
+    }
+    for (blt::u32 i = 0; i < num_values; i++)
+    {
+        BLT_INFO_STREAM << crosstalk_values[i] << " Mag: " << crosstalk_values[i].magnitude() << "\n";
     }
 }
 
