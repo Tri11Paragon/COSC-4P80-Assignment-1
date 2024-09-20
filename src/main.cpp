@@ -48,10 +48,10 @@ auto weight_4 = input_4.transpose() * output_4;
 
 auto inputs = std::array{input_1, input_2, input_3, input_4};
 auto outputs = std::array{output_1, output_2, output_3, output_4};
-auto weights = std::array{weight_1, weight_2, weight_3, weight_4};
 
 auto weight_total_a = weight_1 + weight_2 + weight_3;
 auto weight_total_c = weight_total_a + weight_4;
+auto weights = std::array{weight_total_a, weight_total_c};
 
 crosstalk_t crosstalk_values{};
 
@@ -67,28 +67,33 @@ blt::generalized_matrix<T, rows, columns> normalize(const blt::generalized_matri
     return result;
 }
 
-void test_recall(blt::size_t index)
+auto calculate_recall()
+{
+
+}
+
+void test_recall(blt::size_t index, blt::size_t weight_index)
 {
     auto& input = inputs[index];
     auto& output = outputs[index];
-    auto& associated_weights = weights[index];
+    auto& associated_weights = weights[weight_index];
     
     auto output_recall = normalize(input * associated_weights);
     auto input_recall = normalize(output * associated_weights.transpose());
     
     if (output_recall != output)
     {
-        BLT_ERROR_STREAM << "Output recalled failed!" << "\n";
-        BLT_ERROR_STREAM << "Expected: " << output << "\n";
-        BLT_ERROR_STREAM << "Found: " << output_recall << "\n";
+        BLT_ERROR_STREAM << "Output recalled failed!" << '\n';
+        BLT_ERROR_STREAM << "Expected: " << output << '\n';
+        BLT_ERROR_STREAM << "Found: " << output_recall << '\n';
     } else
         BLT_INFO("Output %ld recall passed!", index + 1);
     
     if (input_recall != input)
     {
         BLT_ERROR_STREAM << "Input recalled failed!" << "\n";
-        BLT_ERROR_STREAM << "Expected: " << input << "\n";
-        BLT_ERROR_STREAM << "Found: " << input_recall << "\n";
+        BLT_ERROR_STREAM << "Expected: " << input << '\n';
+        BLT_ERROR_STREAM << "Found: " << input_recall << '\n';
     } else
         BLT_INFO("Input %ld recall passed!", index + 1);
 }
@@ -96,9 +101,9 @@ void test_recall(blt::size_t index)
 void part_a()
 {
     blt::log_box_t box(BLT_INFO_STREAM, "Part A", 8);
-    test_recall(0);
-    test_recall(1);
-    test_recall(2);
+    test_recall(0, 0);
+    test_recall(1, 0);
+    test_recall(2, 0);
 }
 
 void part_b()
