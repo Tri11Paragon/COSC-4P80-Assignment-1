@@ -24,6 +24,7 @@ constexpr blt::u32 output_count = 4;
 
 using input_t = blt::generalized_matrix<float, 1, input_count>;
 using output_t = blt::generalized_matrix<float, 1, output_count>;
+using weight_t = decltype(std::declval<input_t>().transpose() * std::declval<output_t>());
 using crosstalk_t = blt::generalized_matrix<float, output_count, num_values>;
 
 float crosstalk(const input_t& i, const input_t& j)
@@ -41,17 +42,16 @@ output_t output_2{1, -1, -1, -1};
 output_t output_3{-1, -1, 1, 1};
 output_t output_4{-1, 1, 1, -1};
 
-auto weight_1 = input_1.transpose() * output_1;
-auto weight_2 = input_2.transpose() * output_2;
-auto weight_3 = input_3.transpose() * output_3;
-auto weight_4 = input_4.transpose() * output_4;
+weight_t weight_1 = input_1.transpose() * output_1;
+weight_t weight_2 = input_2.transpose() * output_2;
+weight_t weight_3 = input_3.transpose() * output_3;
+weight_t weight_4 = input_4.transpose() * output_4;
 
 auto inputs = std::array{input_1, input_2, input_3, input_4};
 auto outputs = std::array{output_1, output_2, output_3, output_4};
 
 auto weight_total_a = weight_1 + weight_2 + weight_3;
 auto weight_total_c = weight_total_a + weight_4;
-auto weights = std::array{weight_total_a, weight_total_c};
 
 crosstalk_t crosstalk_values{};
 
@@ -72,43 +72,42 @@ auto calculate_recall()
 
 }
 
-void test_recall(blt::size_t index, blt::size_t weight_index)
+void test_recall(blt::size_t index, const weight_t& associated_weights)
 {
     auto& input = inputs[index];
     auto& output = outputs[index];
-    auto& associated_weights = weights[weight_index];
     
     auto output_recall = normalize(input * associated_weights);
     auto input_recall = normalize(output * associated_weights.transpose());
     
     if (output_recall != output)
     {
-        BLT_ERROR_STREAM << "Output recalled failed!" << '\n';
-        BLT_ERROR_STREAM << "Expected: " << output << '\n';
-        BLT_ERROR_STREAM << "Found: " << output_recall << '\n';
+        BLT_ERROR_STREAM << "Output '" << index + 1 << "' recalled failed!" << '\n';
+        BLT_WARN_STREAM << "\t- Found: " << output_recall.vec_from_column_row() << '\n';
+        BLT_WARN_STREAM << "\t- Expected: " << output.vec_from_column_row() << '\n';
     } else
-        BLT_INFO("Output %ld recall passed!", index + 1);
+        BLT_INFO("Output '%ld' recall passed!", index + 1);
     
     if (input_recall != input)
     {
-        BLT_ERROR_STREAM << "Input recalled failed!" << "\n";
-        BLT_ERROR_STREAM << "Expected: " << input << '\n';
-        BLT_ERROR_STREAM << "Found: " << input_recall << '\n';
+        BLT_ERROR_STREAM << "Input '" << index + 1 << "' recalled failed!" << "\n";
+        BLT_WARN_STREAM << "\t- Found: " << input_recall.vec_from_column_row() << '\n';
+        BLT_WARN_STREAM << "\t- Expected: " << input.vec_from_column_row() << '\n';
     } else
-        BLT_INFO("Input %ld recall passed!", index + 1);
+        BLT_INFO("Input '%ld' recall passed!", index + 1);
 }
 
 void part_a()
 {
-    blt::log_box_t box(BLT_INFO_STREAM, "Part A", 8);
-    test_recall(0, 0);
-    test_recall(1, 0);
-    test_recall(2, 0);
+    blt::log_box_t box(BLT_TRACE_STREAM, "Part A", 8);
+    test_recall(0, weight_total_a);
+    test_recall(1, weight_total_a);
+    test_recall(2, weight_total_a);
 }
 
 void part_b()
 {
-    blt::log_box_t box(BLT_INFO_STREAM, "Part B", 8);
+    blt::log_box_t box(BLT_TRACE_STREAM, "Part B", 8);
     for (blt::u32 i = 0; i < num_values; i++)
     {
         blt::generalized_matrix<float, 1, output_count> accum;
@@ -122,12 +121,13 @@ void part_b()
     }
     for (blt::u32 i = 0; i < num_values; i++)
     {
-        BLT_INFO_STREAM << crosstalk_values[i] << " Mag: " << crosstalk_values[i].magnitude() << "\n";
+        BLT_DEBUG_STREAM << crosstalk_values[i] << " Mag: " << crosstalk_values[i].magnitude() << "\n";
     }
 }
 
 int main()
 {
+    blt::logging::setLogOutputFormat("\033[94m[${{TIME}}]${{RC}} \033[35m(${{FILE}}:${{LINE}})${{RC}} ${{LF}}${{CNR}}${{STR}}${{RC}}\n");
     test_math();
     
     part_a();
