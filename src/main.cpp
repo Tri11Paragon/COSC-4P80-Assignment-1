@@ -127,6 +127,12 @@ int main()
     blt::logging::setLogOutputFormat("\033[94m[${{TIME}}]${{RC}} \033[35m(${{FILE}}:${{LINE}})${{RC}} ${{LF}}${{CNR}}${{STR}}${{RC}}\n");
     a1::test_math();
     
+    for (const auto& [index, value] : blt::enumerate(part_a_inputs))
+        BLT_TRACE_STREAM << index << " : " << value.vec_from_column_row() << '\n';
+    
+    for (const auto& [index, value] : blt::enumerate(part_a_inputs).rev())
+        BLT_TRACE_STREAM << index << " : " << value.vec_from_column_row() << '\n';
+    
     part_a();
     part_b();
     part_c();
