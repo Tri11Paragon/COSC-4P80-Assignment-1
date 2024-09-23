@@ -80,6 +80,7 @@ void execute_BAM(const Weights& weights, const Inputs& input, const Outputs& out
             next_inputs[index] = next.first;
             next_outputs[index] = next.second;
         }
+        // loop until no changes or we hit the iteration limit
     } while ((!a1::equal(current_inputs, next_inputs) || !a1::equal(current_outputs, next_outputs)) && iterations < max_iterations);
     
     BLT_DEBUG("Tracked after %ld iterations", iterations);

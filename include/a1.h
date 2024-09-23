@@ -19,6 +19,7 @@
 #ifndef COSC_4P80_ASSIGNMENT_1_A1_H
 #define COSC_4P80_ASSIGNMENT_1_A1_H
 
+#include <blt/std/logging.h>
 #include <blt/math/matrix.h>
 #include <blt/math/log_util.h>
 
@@ -66,21 +67,32 @@ namespace a1
     }
     
     template<typename T, blt::size_t size>
+    blt::size_t difference(const std::array<T, size>& a, const std::array<T, size>& b)
+    {
+        blt::size_t count = 0;
+        for (const auto& [a_val, b_val] : blt::in_pairs(a, b))
+        {
+            if (a_val != b_val)
+                count++;
+        }
+        return count;
+    }
+    
+    template<typename T, blt::size_t size>
     bool equal(const std::array<T, size>& a, const std::array<T, size>& b)
     {
-        for (const auto& [index, val] : blt::enumerate(a))
-        {
-            if (b[index] != val)
-                return false;
-        }
-        return true;
+        return difference(a, b) == 0;
     }
     
     template<typename weight_t, typename input_t, typename output_t>
     std::pair<input_t, output_t> run_step(const weight_t& associated_weights, const input_t& input, const output_t& output)
     {
         output_t output_recall = input * associated_weights;
-        input_t input_recall = output * associated_weights.transpose();
+        input_t input_recall = output_recall * associated_weights.transpose();
+
+//        BLT_DEBUG_STREAM << "Input: " << input.vec_from_column_row() << "\nOutput: " << output.vec_from_column_row() << '\n';
+//        BLT_DEBUG_STREAM << "Recalled Input: " << a1::threshold(input_recall, input).vec_from_column_row() << "\nRecalled Output: "
+//                         << a1::threshold(output_recall, output).vec_from_column_row() << '\n';
         
         return std::pair{a1::threshold(input_recall, input), a1::threshold(output_recall, output)};
     }
