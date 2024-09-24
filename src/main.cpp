@@ -130,8 +130,16 @@ int main()
     for (const auto& [index, value] : blt::enumerate(part_a_inputs))
         BLT_TRACE_STREAM << index << " : " << value.vec_from_column_row() << '\n';
     
+    BLT_TRACE("");
+    
     for (const auto& [index, value] : blt::enumerate(part_a_inputs).rev())
         BLT_TRACE_STREAM << index << " : " << value.vec_from_column_row() << '\n';
+    
+//    BLT_TRACE(blt::type_string<decltype(blt::enumerate(part_a_inputs))::type>());
+//    BLT_TRACE(blt::type_string<std::iterator_traits<decltype(blt::enumerate(part_a_inputs))::type>::iterator_category>());
+//    BLT_TRACE(blt::type_string<decltype(blt::enumerate(part_a_inputs))::iter>());
+//    BLT_TRACE(blt::type_string<decltype(std::reverse_iterator{part_a_inputs.begin()})::iterator_category>());
+//    std::cout << std::iterator_traits<decltype(blt::enumerate(part_a_inputs))::type>::iterator_category << std::endl;
     
     part_a();
     part_b();
