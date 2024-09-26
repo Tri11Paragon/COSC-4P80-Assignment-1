@@ -151,6 +151,11 @@ int main()
     for (const auto& [index, value] : blt::enumerate(part_c_2_inputs).rev().skip(3).rev())
         BLT_TRACE_STREAM << index << " : " << value.vec_from_column_row() << '\n';
     
+    BLT_TRACE("");
+    
+    for (const auto& [index, value] : blt::enumerate(part_c_2_inputs).skip(2).take(3))
+        BLT_TRACE_STREAM << index << " : " << value.vec_from_column_row() << '\n';
+    
     
 //    part_a();
 //    part_b();
