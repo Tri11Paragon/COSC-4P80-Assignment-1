@@ -156,6 +156,8 @@ int main()
     for (const auto& [index, value] : blt::enumerate(part_c_2_inputs).skip(2).take(3))
         BLT_TRACE_STREAM << index << " : " << value.vec_from_column_row() << '\n';
     
+//    BLT_TRACE("%s", blt::type_string<blt::meta::lowest_iterator_category<std::bidirectional_iterator_tag, std::random_access_iterator_tag, std::input_iterator_tag>::type>().c_str());
+    
     
 //    part_a();
 //    part_b();
