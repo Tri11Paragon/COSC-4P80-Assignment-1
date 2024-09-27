@@ -24,14 +24,19 @@ USER_HOME = Path.home()
 ENVIRONMENT_DATA_LOCATION = USER_HOME / ".brett_scripts.env"
 
 if sys.platform.startswith("win"):
-	CONFIG_FILE_DIRECTORY = Path(os.getenv('APPDATA') + "\BLT")
-	CONFIG_FILE_LOCATION = Path(CONFIG_FILE_DIRECTORY + "\commit_config.env")
+	CONFIG_FILE_DIRECTORY = Path(os.getenv('APPDATA') + "\blt")
+	CONFIG_FILE_LOCATION = Path(CONFIG_FILE_DIRECTORY + "\commit_config.json")
 else:
-	XDG_CONFIG_HOME = Path(os.environ.get('XDG_CONFIG_HOME'))
+	XDG_CONFIG_HOME = os.environ.get('XDG_CONFIG_HOME')
+	if XDG_CONFIG_HOME is None:
+		XDG_CONFIG_HOME = USER_HOME / ".config"
+	else:
+		XDG_CONFIG_HOME = Path(XDG_CONFIG_HOME)
+	
 	if len(str(XDG_CONFIG_HOME)) == 0:
 		XDG_CONFIG_HOME = USER_HOME
 	CONFIG_FILE_DIRECTORY = XDG_CONFIG_HOME / "blt"
-	CONFIG_FILE_LOCATION = CONFIG_FILE_DIRECTORY / "commit_config.env"
+	CONFIG_FILE_LOCATION = CONFIG_FILE_DIRECTORY / "commit_config.json"
 
 class Config:
 	def __init__(self):
@@ -39,31 +44,30 @@ class Config:
 		self.branch_on_major = True
 		self.branch_on_minor = False
 		self.release_on_major = True
-		self.release_on_minor = False
+		self.release_on_minor = True
 		self.main_branch = "main"
 		self.patch_limit = -1
 	
+	def toJSON(self):
+		return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True, indent=4)
+	
+	def fromJSON(file):
+		with open(file, "r") as f:
+			j = json.load(f)
+			obj = Config()
+			[setattr(obj, key, val) for key, val in j.items() if hasattr(obj, key)]
+			return obj
+
 	def from_file(file):
 		values = {}
 		if (not os.path.exists(file)):
 			return Config()
 
-		with open(file, "rt") as f:
-			for line in f:
-				if line.startswith("export"):
-					content = line.split("=")
-					for idx, c in enumerate(content):
-						content[idx] = c.replace("export", "").strip()
-					values[content[0]] = content[1].replace("\"", "").replace("'", "")
-		config = Config()
-		config.branch_on_major = values["branch_on_major"].lower() == "true"
-		config.branch_on_minor = values["branch_on_minor"].lower() == "true"
-		config.release_on_major = values["release_on_major"].lower() == "true"
-		config.release_on_minor = values["release_on_minor"].lower() == "true"
-		config.main_branch = values["main_branch"]
-		config.patch_limit = int(values["patch_limit"])
-  
-		return config;
+		with open(file, "r") as f:
+			j = json.load(f)
+			obj = Config()
+			[setattr(obj, key, val) for key, val in j.items() if hasattr(obj, key)]
+			return obj
 
 	def save_to_file(self, file):
 		dir_index = str(file).rfind("/")
@@ -71,13 +75,8 @@ class Config:
 		if not os.path.exists(dir):
 			print(f"Creating config directory {dir}")
 			os.makedirs(dir)
-		with open(file, 'w') as f:
-			f.write("export branch_on_major=" + str(self.branch_on_major) + "\n")
-			f.write("export branch_on_minor=" + str(self.branch_on_minor) + "\n")
-			f.write("export release_on_major=" + str(self.release_on_major) + "\n")
-			f.write("export release_on_minor=" + str(self.release_on_minor) + "\n")
-			f.write('export main_branch="' + self.main_branch + '"' + "\n")
-			f.write("export patch_limit=" + str(self.patch_limit) + "\n")
+		with open(file, "w") as f:
+			json.dump(self, f, default=lambda o: o.__dict__, sort_keys=True, indent=4)
 			
 
 class EnvData:
@@ -144,7 +143,6 @@ def recombine(cmake_text, version_parts, begin, end):
 	constructed_text_begin = cmake_text[0:begin]
 	constructed_text_end = cmake_text[end::]
 	return constructed_text_begin + constructed_version + constructed_text_end
-
 
 def inc_major(cmake_text):
 	version_parts, begin, end = split_version(cmake_text)
@@ -214,9 +212,16 @@ def main():
 	parser.add_argument("-M", "--major", action='store_true', default=False, required=False)
 	parser.add_argument('-e', "--env", help="environment file", required=False, default=None)
 	parser.add_argument('-c', "--config", help="config file", required=False, default=None)
-	parser.add_argument("--create_default_config", action="store_true", default=False, required=False)
+	parser.add_argument("--create-default-config", action="store_true", default=False, required=False)
+	parser.add_argument("--no-release", action="store_true", default=False, required=False)
+	parser.add_argument("--no-branch", action="store_true", default=False, required=False)
 	
 	args = parser.parse_args()
+ 
+	if args.create_default_config:
+		config = Config()
+		config.save_to_file(args.config if args.config is not None else CONFIG_FILE_LOCATION)
+		return
  
 	if args.env is not None:
 		env = EnvData.get_env_from_file(args.e)
@@ -227,9 +232,6 @@ def main():
 		config = Config.from_file(args.config)
 	else:
 		config = Config.from_file(CONFIG_FILE_LOCATION)
-  
-	if args.create_default_config:
-		config.save_to_file(args.config if args.config is not None else CONFIG_FILE_LOCATION)
 	
 	cmake_text = load_cmake()
 	cmake_version = get_version(cmake_text)[0]
@@ -262,25 +264,24 @@ def main():
 		print("Selected patch")
 		write_cmake(inc_patch(config, cmake_text))
 
-	
 	subprocess.call(["git", "add", "*"])
 	subprocess.call(["git", "commit"])
  
 	cmake_text = load_cmake()
 	version_parts = split_version(cmake_text)[0]
-	if args.major:
+	if not args.no_branch and args.major:
 		if config.branch_on_major:
 			make_branch(config, "v" + str(version_parts[0]))
-	if args.minor:
+	if not args.no_branch and args.minor:
 		if config.branch_on_minor:
 			make_branch(config, "v" + str(version_parts[0]) + "." + str(version_parts[1]))
 		
 	subprocess.call(["sh", "-c", "git remote | xargs -L1 git push --all"])
  
-	if args.major:
+	if not args.no_release and args.major:
 		if config.release_on_major:
 			make_release(env, "v" + str(version_parts[0]))
-	if args.minor:
+	if not args.no_release and args.minor:
 		if config.release_on_minor:
 			make_release(env, "v" + str(version_parts[0]) + "." + str(version_parts[1]))
   
