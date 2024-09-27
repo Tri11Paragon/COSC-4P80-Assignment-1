@@ -173,12 +173,11 @@ def make_release(env: EnvData, name):
 	repos_v = open_process(["git", "remote", "-v"])[0].splitlines()
 	urls = []
 	for line in repos_v:
-		print(line.decode('utf8'))
 		origin = ''.join(itertools.takewhile(str.isalpha, line.decode('utf8')))
 		print(f"Origin: {origin}")
-		urls.append(open_process(["git", "remote", "get-url", origin])[0])
+		urls.append(open_process(["git", "remote", "get-url", origin])[0].decode('utf8'))
 	urls = set(urls)
-	print(urls)
+	print(f"Urls: {urls}")
 	data = {
 		'tag_name': name,
 		'name': name,
