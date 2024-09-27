@@ -174,8 +174,7 @@ def make_release(env: EnvData, name):
 	urls = []
 	for line in repos_v:
 		origin = ''.join(itertools.takewhile(str.isalpha, line.decode('utf8')))
-		print(f"Origin: {origin}")
-		urls.append(open_process(["git", "remote", "get-url", origin])[0].decode('utf8').replace("\n", "") + "/releases")
+		urls.append("https://api.github.com/repos/" + open_process(["git", "remote", "get-url", origin])[0].decode('utf8').replace("\n", "").replace("https://github.com/") + "releases")
 	urls = set(urls)
 	print(f"Urls: {urls}")
 	data = {
