@@ -173,7 +173,7 @@ def make_release(env: EnvData, name):
 	repos_v = open_process(["git", "remote", "-v"])[0].splitlines()
 	urls = []
 	for line in repos_v:
-		origin = ''.join(itertools.takewhile(not str.isspace, line))
+		origin = ''.join(itertools.takewhile(str.isalpha, line))
 		print(f"Origin: {origin}")
 		urls.append(open_process(["git", "remote", "get-url", origin])[0])
 	urls = set(urls)
@@ -263,6 +263,7 @@ def main():
 	subprocess.call(["git", "add", "*"])
 	subprocess.call(["git", "commit"])
  
+	cmake_text = load_cmake()
 	if args.major:
 		version_parts = split_version(cmake_text)[0]
 		if config.branch_on_major:
