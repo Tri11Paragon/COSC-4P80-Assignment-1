@@ -174,7 +174,7 @@ def make_release(env: EnvData, name):
 	urls = []
 	for line in repos_v:
 		origin = ''.join(itertools.takewhile(str.isalpha, line.decode('utf8')))
-		urls.append("https://api.github.com/repos/" + open_process(["git", "remote", "get-url", origin])[0].decode('utf8').replace("\n", "").replace("https://github.com/", "") + "releases")
+		urls.append("https://api.github.com/repos/" + open_process(["git", "remote", "get-url", origin], False)[0].decode('utf8').replace("\n", "").replace("https://github.com/", "") + "/releases")
 	urls = set(urls)
 	print(f"Urls: {urls}")
 	data = {
@@ -185,8 +185,9 @@ def make_release(env: EnvData, name):
 		'prerelease': False
 	}
 	headers = {
-		'Authorization': f'token {env.github_token}',
-		'Accept': 'application/vnd.github.v3+json'
+		'Authorization': f'Bearer {env.github_token}',
+		'Accept': 'application/vnd.github+json',
+		'X-GitHub-Api-Version': '2022-11-28'
 	}
 	for url in urls:
 		response = requests.post(url, headers=headers, data=json.dumps(data))
