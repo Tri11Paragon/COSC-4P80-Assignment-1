@@ -156,11 +156,35 @@ int main()
     for (const auto& [index, value] : blt::enumerate(part_c_2_inputs).skip(2).take(3))
         BLT_TRACE_STREAM << index << " : " << value.vec_from_column_row() << '\n';
     
-    for (const auto& [a, b] : blt::in_pairs(part_a_inputs, part_a_outputs))
+    BLT_TRACE("");
+    
+    for (const auto& [a, b] : blt::in_pairs(part_a_inputs, part_a_outputs).enumerate())
     {
-        BLT_TRACE_STREAM << a << " : " << b << "\n";
+        auto& [ma, mb] = b;
+        BLT_TRACE_STREAM << a << " : " << ma.vec_from_column_row() << " " << mb.vec_from_column_row() << "\n";
     }
-
+    
+    BLT_TRACE("");
+    
+    for (const auto& [a, b] : blt::in_pairs(part_a_inputs, part_a_outputs).rev())
+    {
+        BLT_TRACE_STREAM << a.vec_from_column_row() << " : " << b.vec_from_column_row() << "\n";
+    }
+    
+    BLT_TRACE("");
+    
+    for (const auto& [a, b] : blt::in_pairs(part_a_inputs, part_a_outputs).take(1))
+    {
+        BLT_TRACE_STREAM << a.vec_from_column_row() << " : " << b.vec_from_column_row() << "\n";
+    }
+    
+    BLT_TRACE("");
+    
+    for (const auto& [a, b] : blt::in_pairs(part_a_inputs, part_a_outputs).skip(1))
+    {
+        BLT_TRACE_STREAM << a.vec_from_column_row() << " : " << b.vec_from_column_row() << "\n";
+    }
+    
 //    BLT_TRACE("%s", blt::type_string<blt::meta::lowest_iterator_category<std::bidirectional_iterator_tag, std::random_access_iterator_tag, std::input_iterator_tag>::type>().c_str());
 
 
