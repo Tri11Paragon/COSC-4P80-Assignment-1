@@ -164,8 +164,7 @@ def inc_patch(config: Config, cmake_text):
 
 def make_branch(config: Config, name):
 	print(f"Making new branch {name}")
-	subprocess.call(["git", "branch", "-b", name])
-	subprocess.call(["git", "checkout", name])
+	subprocess.call(["git", "checkout", "-b", name])
 	subprocess.call(["git", "merge", config.main_branch])
 	subprocess.call(["git", "checkout", config.main_branch])
 
@@ -174,7 +173,7 @@ def make_release(env: EnvData, name):
 	repos_v = open_process(["git", "remote", "-v"])[0].splitlines()
 	urls = []
 	for line in repos_v:
-		origin = itertools.takewhile(lambda c: not c.isspace(), line)
+		origin = ''.join(itertools.takewhile(lambda c: not c.isspace(), line))
 		print(f"Origin: {origin}")
 		urls.append(open_process(["git", "remote", "get-url", origin])[0])
 	urls = set(urls)
