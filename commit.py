@@ -56,15 +56,12 @@ class Config:
 						content[idx] = c.replace("export", "").strip()
 					values[content[0]] = content[1].replace("\"", "").replace("'", "")
 		config = Config()
-		try:
-			config.branch_on_major = values["branch_on_major"].lower() == "true"
-			config.branch_on_minor = values["branch_on_minor"].lower() == "true"
-			config.release_on_major = values["release_on_major"].lower() == "true"
-			config.release_on_minor = values["release_on_minor"].lower() == "true"
-			config.main_branch = values["main_branch"]
-			config.patch_limit = int(values["patch_limit"])
-		except:
-			return config
+		config.branch_on_major = values["branch_on_major"].lower() == "true"
+		config.branch_on_minor = values["branch_on_minor"].lower() == "true"
+		config.release_on_major = values["release_on_major"].lower() == "true"
+		config.release_on_minor = values["release_on_minor"].lower() == "true"
+		config.main_branch = values["main_branch"]
+		config.patch_limit = int(values["patch_limit"])
   
 		return config;
 
