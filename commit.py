@@ -212,8 +212,8 @@ def main():
 	parser.add_argument("-p", "--patch", action='store_true', default=False, required=False)
 	parser.add_argument("-m", "--minor", action='store_true', default=False, required=False)
 	parser.add_argument("-M", "--major", action='store_true', default=False, required=False)
-	parser.add_argument('-e', "--env", help="environment file", required=False)
-	parser.add_argument('-c', "--config", help="config file", required=False)
+	parser.add_argument('-e', "--env", help="environment file", required=False, default=None)
+	parser.add_argument('-c', "--config", help="config file", required=False, default=None)
 	parser.add_argument("--create_default_config", action="store_true", default=False, required=False)
 	
 	args = parser.parse_args()
@@ -267,10 +267,11 @@ def main():
 	subprocess.call(["git", "commit"])
  
 	cmake_text = load_cmake()
+	version_parts = split_version(cmake_text)[0]
 	if args.major:
-		version_parts = split_version(cmake_text)[0]
 		if config.branch_on_major:
 			make_branch(config, "v" + str(version_parts[0]))
+	if args.minor:
 		if config.branch_on_minor:
 			make_branch(config, "v" + str(version_parts[0]) + "." + str(version_parts[1]))
 		
@@ -279,6 +280,7 @@ def main():
 	if args.major:
 		if config.release_on_major:
 			make_release(env, "v" + str(version_parts[0]))
+	if args.minor:
 		if config.release_on_minor:
 			make_release(env, "v" + str(version_parts[0]) + "." + str(version_parts[1]))
   
