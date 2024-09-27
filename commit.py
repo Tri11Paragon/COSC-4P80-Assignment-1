@@ -171,11 +171,10 @@ def make_branch(config: Config, name):
 def make_release(env: EnvData, name):
 	print(f"Making new release {name}")
 	repos_v = open_process(["git", "remote", "-v"])[0].splitlines()
-	print(repos_v)
-	exit(0)
 	urls = []
 	for line in repos_v:
-		origin = ''.join(itertools.takewhile(str.isalpha, line))
+		print(line.decode('utf8'))
+		origin = ''.join(itertools.takewhile(str.isalpha, line.decode('utf8')))
 		print(f"Origin: {origin}")
 		urls.append(open_process(["git", "remote", "get-url", origin])[0])
 	urls = set(urls)
