@@ -56,6 +56,8 @@ class Config:
 			j = json.load(f)
 			obj = Config()
 			[setattr(obj, key, val) for key, val in j.items() if hasattr(obj, key)]
+			if obj.branch_on_minor:
+				obj.branch_on_major = True
 			return obj
 
 	def from_file(file):
@@ -169,6 +171,12 @@ def make_branch(config: Config, name):
 	subprocess.call(["git", "checkout", "-b", name])
 	subprocess.call(["git", "merge", config.main_branch])
 	subprocess.call(["git", "checkout", config.main_branch])
+ 
+def sync_branch(config: Config, version_parts, args):
+    if config.branch_on_major:
+        # Branch will be created.
+        if args.minor:
+            return;
 
 def make_release(env: EnvData, name):
 	print(f"Making new release {name}")
@@ -269,20 +277,39 @@ def main():
  
 	cmake_text = load_cmake()
 	version_parts = split_version(cmake_text)[0]
-	if not args.no_branch and args.major:
+	if args.major:
 		if config.branch_on_major:
-			make_branch(config, "v" + str(version_parts[0]))
-	if not args.no_branch and args.minor:
+			if not args.no_branch:
+				make_branch(config, "v" + str(version_parts[0]))
+	
+	if args.minor:
 		if config.branch_on_minor:
-			make_branch(config, "v" + str(version_parts[0]) + "." + str(version_parts[1]))
+			if not args.no_branch:
+				make_branch(config, "v" + str(version_parts[0]) + "." + str(version_parts[1]))
+		elif config.branch_on_major:
+			subprocess.call(["git", "checkout", "v" + str(version_parts[0])])
+			subprocess.call(["git", "rebase", config.main_branch])
+			subprocess.call(["git", "checkout", config.main_branch])
+
+	if args.patch:
+		if config.branch_on_minor:
+			subprocess.call(["git", "checkout", "v" + str(version_parts[0]) + "." + str(version_parts[1])])
+			subprocess.call(["git", "rebase", config.main_branch])
+			subprocess.call(["git", "checkout", config.main_branch])
+		elif config.branch_on_major:
+			subprocess.call(["git", "checkout", "v" + str(version_parts[0])])
+			subprocess.call(["git", "rebase", config.main_branch])
+			subprocess.call(["git", "checkout", config.main_branch])
+  
+	sync_branch(config=config, version_parts=version_parts, args=args)
 		
 	subprocess.call(["sh", "-c", "git remote | xargs -L1 git push --all"])
  
-	if not args.no_release and args.major:
-		if config.release_on_major:
+	if args.major:
+		if not args.no_release and config.release_on_major:
 			make_release(env, "v" + str(version_parts[0]))
-	if not args.no_release and args.minor:
-		if config.release_on_minor:
+	if args.minor:
+		if not args.no_release and config.release_on_minor:
 			make_release(env, "v" + str(version_parts[0]) + "." + str(version_parts[1]))
   
 if __name__ == "__main__":
