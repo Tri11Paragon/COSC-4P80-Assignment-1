@@ -56,10 +56,15 @@ class Config:
 						content[idx] = c.replace("export", "").strip()
 					values[content[0]] = content[1].replace("\"", "").replace("'", "")
 		config = Config()
-		config.branch_on_major = values["branch_on_major"].lower() == "true"
-		config.release_on_major = values["release_on_major"].lower() == "true"
-		config.main_branch = values["main_branch"]
-		config.patch_limit = int(values["patch_limit"])
+		try:
+			config.branch_on_major = values["branch_on_major"].lower() == "true"
+			config.branch_on_minor = values["branch_on_minor"].lower() == "true"
+			config.release_on_major = values["release_on_major"].lower() == "true"
+			config.release_on_minor = values["release_on_minor"].lower() == "true"
+			config.main_branch = values["main_branch"]
+			config.patch_limit = int(values["patch_limit"])
+		except:
+			return config
   
 		return config;
 
@@ -71,7 +76,9 @@ class Config:
 			os.makedirs(dir)
 		with open(file, 'w') as f:
 			f.write("export branch_on_major=" + str(self.branch_on_major) + "\n")
+			f.write("export branch_on_minor=" + str(self.branch_on_minor) + "\n")
 			f.write("export release_on_major=" + str(self.release_on_major) + "\n")
+			f.write("export release_on_minor=" + str(self.release_on_minor) + "\n")
 			f.write('export main_branch="' + self.main_branch + '"' + "\n")
 			f.write("export patch_limit=" + str(self.patch_limit) + "\n")
 			
@@ -176,11 +183,10 @@ def make_release(env: EnvData, name):
 		origin = ''.join(itertools.takewhile(str.isalpha, line.decode('utf8')))
 		urls.append("https://api.github.com/repos/" + open_process(["git", "remote", "get-url", origin], False)[0].decode('utf8').replace("\n", "").replace("https://github.com/", "") + "/releases")
 	urls = set(urls)
-	print(f"Urls: {urls}")
 	data = {
 		'tag_name': name,
 		'name': name,
-		'body': "Automated Release",
+		'body': "Automated Release '" + name + "'",
 		'draft': False,
 		'prerelease': False
 	}
@@ -270,13 +276,14 @@ def main():
 			make_branch(config, "v" + str(version_parts[0]))
 		if config.branch_on_minor:
 			make_branch(config, "v" + str(version_parts[0]) + "." + str(version_parts[1]))
+		
+	subprocess.call(["sh", "-c", "git remote | xargs -L1 git push --all"])
+ 
+	if args.major:
 		if config.release_on_major:
 			make_release(env, "v" + str(version_parts[0]))
 		if config.release_on_minor:
 			make_release(env, "v" + str(version_parts[0]) + "." + str(version_parts[1]))
-			
- 
-	subprocess.call(["sh", "-c", "git remote | xargs -L1 git push --all"])
   
 if __name__ == "__main__":
 	main()
