@@ -3,7 +3,7 @@
 #include <blt/math/log_util.h>
 #include "blt/std/assert.h"
 #include <blt/format/boxing.h>
-#include <blt/std/iterator.h>
+#include <blt/iterator/iterator.h>
 #include <a1.h>
 
 constexpr blt::u32 num_values = 4;
