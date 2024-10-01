@@ -3,17 +3,19 @@
 #include <blt/math/log_util.h>
 #include "blt/std/assert.h"
 #include <blt/format/boxing.h>
-#include <blt/std/iterator.h>
+#include <blt/iterator/iterator.h>
 #include <a1.h>
 
-constexpr blt::u32 num_values = 4;
-constexpr blt::u32 input_count = 5;
-constexpr blt::u32 output_count = 4;
+constexpr blt::u32 num_values_part_a = 3;
+constexpr blt::u32 num_values_part_c1 = 4;
+constexpr blt::u32 num_values_part_c2 = 7;
+constexpr blt::u32 input_vec_size = 5;
+constexpr blt::u32 output_vec_size = 4;
 
-using input_t = blt::generalized_matrix<float, 1, input_count>;
-using output_t = blt::generalized_matrix<float, 1, output_count>;
+using input_t = blt::generalized_matrix<float, 1, input_vec_size>;
+using output_t = blt::generalized_matrix<float, 1, output_vec_size>;
 using weight_t = decltype(std::declval<input_t>().transpose() * std::declval<output_t>());
-using crosstalk_t = blt::generalized_matrix<float, output_count, num_values>;
+using crosstalk_t = blt::generalized_matrix<float, 1, output_vec_size>;
 
 // part a
 input_t input_1{-1, 1, 1, 1, -1};
@@ -58,106 +60,77 @@ const auto weight_total_a = weight_1 + weight_2 + weight_3;
 const auto weight_total_c = weight_total_a + weight_4;
 const auto weight_total_c_2 = weight_total_c + weight_5 + weight_6 + weight_7;
 
-crosstalk_t crosstalk_values{};
+crosstalk_t crosstalk_values[num_values_part_a];
 
-//template<typename Weights, typename Inputs, typename Outputs>
-//void execute_BAM(const Weights& weights, const Inputs& input, const Outputs& output)
-//{
-//    auto current_inputs = input;
-//    auto current_outputs = output;
-//    auto next_inputs = current_inputs;
-//    auto next_outputs = current_outputs;
-//    blt::size_t iterations = 0;
-//    constexpr blt::size_t max_iterations = 5;
-//
-//    do
-//    {
-//        current_inputs = next_inputs;
-//        current_outputs = next_outputs;
-//        ++iterations;
-//        for (const auto& [index, val] : blt::enumerate(current_inputs))
-//        {
-//            auto next = a1::run_step(weights, val, current_outputs[index]);
-//            next_inputs[index] = next.first;
-//            next_outputs[index] = next.second;
-//        }
-//        // loop until no changes or we hit the iteration limit
-//    } while ((!a1::equal(current_inputs, next_inputs) || !a1::equal(current_outputs, next_outputs)) && iterations < max_iterations);
-//
-//    BLT_DEBUG("Tracked after %ld iterations", iterations);
-//    a1::check_recall(weights, next_inputs, next_outputs);
-//}
-//
-//void part_a()
-//{
-//    blt::log_box_t box(BLT_TRACE_STREAM, "Part A", 8);
-//
-//    execute_BAM(weight_total_a, part_a_inputs, part_a_outputs);
-//}
-//
-//void part_b()
-//{
-//    blt::log_box_t box(BLT_TRACE_STREAM, "Part B", 8);
-//    for (blt::u32 i = 0; i < num_values; i++)
-//    {
-//        blt::generalized_matrix<float, 1, output_count> accum;
-//        for (blt::u32 k = 0; k < num_values; k++)
-//        {
-//            if (i == k)
-//                continue;
-//            accum += (part_a_outputs[k] * a1::crosstalk(part_a_inputs[k].normalize(), part_a_inputs[i].normalize()));
-//        }
-//        crosstalk_values.assign_to_column_from_column_rows(accum, i);
-//    }
-//    for (blt::u32 i = 0; i < num_values; i++)
-//    {
-//        BLT_DEBUG_STREAM << crosstalk_values[i] << " Mag: " << crosstalk_values[i].magnitude() << "\n";
-//    }
-//}
-//
-//void part_c()
-//{
-//    blt::log_box_t box(BLT_TRACE_STREAM, "Part C", 8);
-//    execute_BAM(weight_total_c, part_c_1_inputs, part_c_1_outputs);
-//    BLT_TRACE("--- { Part C with 3 extra pairs } ---");
-//    execute_BAM(weight_total_c_2, part_c_2_inputs, part_c_2_outputs);
-//}
+template<typename Weights, typename Inputs, typename Outputs>
+void execute_BAM(const Weights& weights, const Inputs& input, const Outputs& output)
+{
+    auto current_inputs = input;
+    auto current_outputs = output;
+    auto next_inputs = current_inputs;
+    auto next_outputs = current_outputs;
+    blt::size_t iterations = 0;
+    constexpr blt::size_t max_iterations = 5;
+    
+    do
+    {
+        current_inputs = next_inputs;
+        current_outputs = next_outputs;
+        ++iterations;
+        for (const auto& [index, val] : blt::enumerate(current_inputs))
+        {
+            auto next = a1::run_step(weights, val, current_outputs[index]);
+            next_inputs[index] = next.first;
+            next_outputs[index] = next.second;
+        }
+        // loop until no changes or we hit the iteration limit
+    } while ((!a1::equal(current_inputs, next_inputs) || !a1::equal(current_outputs, next_outputs)) && iterations < max_iterations);
+    
+    BLT_DEBUG("Tracked after %ld iterations", iterations);
+    a1::check_recall(weights, next_inputs, next_outputs);
+}
+
+void part_a()
+{
+    blt::log_box_t box(BLT_TRACE_STREAM, "Part A", 8);
+    
+    execute_BAM(weight_total_a, part_a_inputs, part_a_outputs);
+}
+
+void part_b()
+{
+    blt::log_box_t box(BLT_TRACE_STREAM, "Part B", 8);
+    for (blt::u32 i = 0; i < num_values_part_a; i++)
+    {
+        crosstalk_values[i] = {};
+        for (blt::u32 k = 0; k < num_values_part_a; k++)
+        {
+            if (i == k)
+                continue;
+            crosstalk_values[i] += (part_a_outputs[i] * a1::crosstalk(part_a_inputs[i].normalize(), part_a_inputs[k].normalize())).abs();
+        }
+    }
+    for (const auto& crosstalk_value : crosstalk_values)
+    {
+        auto vec = crosstalk_value.vec_from_column_row();
+        BLT_DEBUG_STREAM << vec << " Mag: " << vec.magnitude() << "\n";
+    }
+}
+
+void part_c()
+{
+    blt::log_box_t box(BLT_TRACE_STREAM, "Part C", 8);
+    execute_BAM(weight_total_c, part_c_1_inputs, part_c_1_outputs);
+    BLT_TRACE("--- { Part C with 3 extra pairs } ---");
+    execute_BAM(weight_total_c_2, part_c_2_inputs, part_c_2_outputs);
+}
 
 int main()
 {
     blt::logging::setLogOutputFormat("\033[94m[${{TIME}}]${{RC}} \033[35m(${{FILE}}:${{LINE}})${{RC}} ${{LF}}${{CNR}}${{STR}}${{RC}}\n");
-//    a1::test_math();
+    a1::test_math();
     
-    for (const auto& [index, value] : blt::enumerate(part_c_2_inputs))
-        BLT_TRACE_STREAM << index << " : " << value.vec_from_column_row() << '\n';
-    
-    BLT_TRACE("");
-
-    for (const auto& [index, value] : blt::enumerate(part_c_2_inputs).rev())
-        BLT_TRACE_STREAM << index << " : " << value.vec_from_column_row() << '\n';
-    
-    BLT_TRACE("");
-    
-    for (const auto& [index, value] : blt::enumerate(part_c_2_inputs).skip(3))
-        BLT_TRACE_STREAM << index << " : " << value.vec_from_column_row() << '\n';
-    
-    BLT_TRACE("");
-    
-    for (const auto& [index, value] : blt::enumerate(part_c_2_inputs).skip(3).rev())
-        BLT_TRACE_STREAM << index << " : " << value.vec_from_column_row() << '\n';
-    
-    BLT_TRACE("");
-    
-    for (const auto& [index, value] : blt::enumerate(part_c_2_inputs).rev().skip(3).rev())
-        BLT_TRACE_STREAM << index << " : " << value.vec_from_column_row() << '\n';
-    
-    BLT_TRACE("");
-    
-    for (const auto& [index, value] : blt::enumerate(part_c_2_inputs).skip(2).take(3))
-        BLT_TRACE_STREAM << index << " : " << value.vec_from_column_row() << '\n';
-    
-    
-//    part_a();
-//    part_b();
-//    part_c();
+    part_a();
+    part_b();
+    part_c();
 }
