@@ -22,14 +22,20 @@
 #include <blt/std/logging.h>
 #include <blt/math/matrix.h>
 #include <blt/math/log_util.h>
+#include <algorithm>
+#include <numeric>
+#include <vector>
 
 namespace a1
 {
+    template<blt::size_t rows, blt::size_t columns>
+    using matrix_t = blt::generalized_matrix<float, rows, columns>;
+    
     void test_math()
     {
-        blt::generalized_matrix<float, 1, 4> input{1, -1, -1, 1};
-        blt::generalized_matrix<float, 1, 3> output{1, 1, 1};
-        blt::generalized_matrix<float, 4, 3> expected{
+        matrix_t<1, 4> input{1, -1, -1, 1};
+        matrix_t<1, 3> output{1, 1, 1};
+        matrix_t<4, 3> expected{
                 blt::vec4{1, -1, -1, 1},
                 blt::vec4{1, -1, -1, 1},
                 blt::vec4{1, -1, -1, 1}
@@ -41,8 +47,8 @@ namespace a1
         blt::vec4 one{5, 1, 3, 0};
         blt::vec4 two{9, -5, -8, 3};
         
-        blt::generalized_matrix<float, 1, 4> g1{5, 1, 3, 0};
-        blt::generalized_matrix<float, 1, 4> g2{9, -5, -8, 3};
+        matrix_t<1, 4> g1{5, 1, 3, 0};
+        matrix_t<1, 4> g2{9, -5, -8, 3};
         
         BLT_ASSERT(g1 * g2.transpose() == blt::vec4::dot(one, two) && "MATH DOT FAILURE");
     }
@@ -53,21 +59,8 @@ namespace a1
         return i * j.transpose();
     }
     
-    template<typename T, blt::u32 rows, blt::u32 columns>
-    blt::generalized_matrix<T, rows, columns> threshold(const blt::generalized_matrix<T, rows, columns>& y,
-                                                        const blt::generalized_matrix<T, rows, columns>& base)
-    {
-        blt::generalized_matrix<T, rows, columns> result;
-        for (blt::u32 i = 0; i < columns; i++)
-        {
-            for (blt::u32 j = 0; j < rows; j++)
-                result[i][j] = y[i][j] > 1 ? 1 : (y[i][j] < -1 ? -1 : base[i][j]);
-        }
-        return result;
-    }
-    
-    template<typename T, blt::size_t size>
-    blt::size_t difference(const std::array<T, size>& a, const std::array<T, size>& b)
+    template<typename T>
+    blt::size_t difference(const std::vector<T>& a, const std::vector<T>& b)
     {
         blt::size_t count = 0;
         for (const auto& [a_val, b_val] : blt::in_pairs(a, b))
@@ -78,8 +71,8 @@ namespace a1
         return count;
     }
     
-    template<typename T, blt::size_t size>
-    bool equal(const std::array<T, size>& a, const std::array<T, size>& b)
+    template<typename T>
+    bool equal(const std::vector<T>& a, const std::vector<T>& b)
     {
         return difference(a, b) == 0;
     }
@@ -89,16 +82,12 @@ namespace a1
     {
         output_t output_recall = input * associated_weights;
         input_t input_recall = output_recall * associated_weights.transpose();
-
-//        BLT_DEBUG_STREAM << "Input: " << input.vec_from_column_row() << "\nOutput: " << output.vec_from_column_row() << '\n';
-//        BLT_DEBUG_STREAM << "Recalled Input: " << a1::threshold(input_recall, input).vec_from_column_row() << "\nRecalled Output: "
-//                         << a1::threshold(output_recall, output).vec_from_column_row() << '\n';
         
         return std::pair{a1::threshold(input_recall, input), a1::threshold(output_recall, output)};
     }
     
-    template<typename weight_t, typename T, typename G, blt::size_t size>
-    void check_recall(const weight_t& weights, const std::array<G, size>& inputs, const std::array<T, size>& outputs)
+    template<typename weight_t, typename T, typename G>
+    void check_recall(const weight_t& weights, const std::vector<G>& inputs, const std::vector<T>& outputs)
     {
         for (const auto& [index, val] : blt::enumerate(inputs))
         {

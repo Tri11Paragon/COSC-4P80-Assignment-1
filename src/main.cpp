@@ -1,4 +1,5 @@
 #include <iostream>
+#include <utility>
 #include <blt/math/matrix.h>
 #include <blt/math/log_util.h>
 #include "blt/std/assert.h"
@@ -12,10 +13,99 @@ constexpr blt::u32 num_values_part_c2 = 7;
 constexpr blt::u32 input_vec_size = 5;
 constexpr blt::u32 output_vec_size = 4;
 
-using input_t = blt::generalized_matrix<float, 1, input_vec_size>;
-using output_t = blt::generalized_matrix<float, 1, output_vec_size>;
+using input_t = a1::matrix_t<1, input_vec_size>;
+using output_t = a1::matrix_t<1, output_vec_size>;
 using weight_t = decltype(std::declval<input_t>().transpose() * std::declval<output_t>());
-using crosstalk_t = blt::generalized_matrix<float, 1, output_vec_size>;
+using crosstalk_t = a1::matrix_t<1, output_vec_size>;
+
+class ping_pong
+{
+    public:
+        ping_pong(weight_t weights, input_t input): weights(std::move(weights)), input(std::move(input))
+        {}
+        
+        ping_pong(weight_t weights, input_t input, output_t output): weights(std::move(weights)), input(std::move(input)), output(std::move(output))
+        {}
+        
+        [[nodiscard]] ping_pong run_step() const
+        {
+            auto out = input * weights;
+            return {weights, threshold(out * weights.transpose()), threshold(out)};
+        }
+        
+        [[nodiscard]] ping_pong pong() const
+        {
+            return run_step();
+        }
+        
+        input_t get_input()
+        {
+            return input;
+        }
+        
+        output_t get_output()
+        {
+            return output;
+        }
+        
+        friend bool operator==(const ping_pong& a, const ping_pong& b)
+        {
+            return a.input == b.input && a.output == b.output;
+        }
+        
+        template<blt::u32 rows, blt::u32 columns>
+        static a1::matrix_t<rows, columns> threshold(const a1::matrix_t<rows, columns>& y)
+        {
+            a1::matrix_t<rows, columns> result;
+            for (blt::u32 i = 0; i < columns; i++)
+            {
+                for (blt::u32 j = 0; j < rows; j++)
+                    result[i][j] = y[i][j] >= 0 ? 1 : -1;
+            }
+            return result;
+        }
+    
+    private:
+        weight_t weights;
+        input_t input;
+        output_t output;
+};
+
+class executor
+{
+    public:
+        executor(weight_t weights, std::vector<input_t> inputs, std::vector<output_t> outputs):
+                weights(std::move(weights)), inputs(std::move(inputs)), outputs(std::move(outputs))
+        {}
+        
+        void execute()
+        {
+            std::vector<ping_pong> initial_pings;
+            for (auto [input, output] : blt::in_pairs(inputs, outputs))
+                initial_pings.emplace_back(weights, input, output);
+            steps.emplace_back(std::move(initial_pings));
+            // execute while the entries don't equal each other (no stability in the system)
+            do
+            {
+                auto& prev = steps.rbegin()[0];
+                std::vector<ping_pong> next_pongs;
+                for (auto& ping : prev)
+                    next_pongs.emplace_back(ping.pong());
+                steps.emplace_back(std::move(next_pongs));
+            } while (!(steps.rbegin()[0] == steps.rbegin()[1]));
+        }
+        
+        void print_chains()
+        {
+        
+        }
+    
+    private:
+        weight_t weights;
+        std::vector<input_t> inputs;
+        std::vector<output_t> outputs;
+        std::vector<std::vector<ping_pong>> steps;
+};
 
 // part a
 input_t input_1{-1, 1, 1, 1, -1};
@@ -47,14 +137,14 @@ const weight_t weight_5 = input_5.transpose() * output_5;
 const weight_t weight_6 = input_6.transpose() * output_6;
 const weight_t weight_7 = input_7.transpose() * output_7;
 
-auto part_a_inputs = std::array{input_1, input_2, input_3};
-auto part_a_outputs = std::array{output_1, output_2, output_3};
+auto part_a_inputs = std::vector{input_1, input_2, input_3};
+auto part_a_outputs = std::vector{output_1, output_2, output_3};
 
-auto part_c_1_inputs = std::array{input_1, input_2, input_3, input_4};
-auto part_c_1_outputs = std::array{output_1, output_2, output_3, output_4};
+auto part_c_1_inputs = std::vector{input_1, input_2, input_3, input_4};
+auto part_c_1_outputs = std::vector{output_1, output_2, output_3, output_4};
 
-auto part_c_2_inputs = std::array{input_1, input_2, input_3, input_4, input_5, input_6, input_7};
-auto part_c_2_outputs = std::array{output_1, output_2, output_3, output_4, output_5, output_6, output_7};
+auto part_c_2_inputs = std::vector{input_1, input_2, input_3, input_4, input_5, input_6, input_7};
+auto part_c_2_outputs = std::vector{output_1, output_2, output_3, output_4, output_5, output_6, output_7};
 
 const auto weight_total_a = weight_1 + weight_2 + weight_3;
 const auto weight_total_c = weight_total_a + weight_4;
