@@ -81,6 +81,7 @@ class executor
         void execute()
         {
             std::vector<ping_pong> initial_pings;
+            initial_pings.reserve(inputs.size());
             for (auto [input, output] : blt::in_pairs(inputs, outputs))
                 initial_pings.emplace_back(weights, input, output);
             steps.emplace_back(std::move(initial_pings));
@@ -89,6 +90,7 @@ class executor
             {
                 auto& prev = steps.rbegin()[0];
                 std::vector<ping_pong> next_pongs;
+                next_pongs.reserve(prev.size());
                 for (auto& ping : prev)
                     next_pongs.emplace_back(ping.pong());
                 steps.emplace_back(std::move(next_pongs));
@@ -97,7 +99,26 @@ class executor
         
         void print_chains()
         {
-        
+            std::vector<std::string> input;
+            input.reserve(inputs.size());
+            input.resize(inputs.size());
+            std::vector<std::string> output;
+            output.reserve(output.size());
+            output.resize(output.size());
+            for (auto [index, ref_pair] : blt::in_pairs(input, output).enumerate())
+            {
+                auto& [i, o] = ref_pair;
+                auto& current_line = steps[index];
+                for (auto& ping : current_line)
+                {
+                
+                }
+            }
+            for (auto [i, o] : blt::in_pairs(input, output))
+            {
+                BLT_TRACE_STREAM << i << "\n";
+                BLT_TRACE_STREAM << o << "\n";
+            }
         }
     
     private:
@@ -153,38 +174,37 @@ const auto weight_total_c_2 = weight_total_c + weight_5 + weight_6 + weight_7;
 crosstalk_t crosstalk_values[num_values_part_a];
 
 template<typename Weights, typename Inputs, typename Outputs>
-void execute_BAM(const Weights& weights, const Inputs& input, const Outputs& output)
+void execute_BAM(const Weights&, const Inputs&, const Outputs&)
 {
-    auto current_inputs = input;
-    auto current_outputs = output;
-    auto next_inputs = current_inputs;
-    auto next_outputs = current_outputs;
-    blt::size_t iterations = 0;
-    constexpr blt::size_t max_iterations = 5;
-    
-    do
-    {
-        current_inputs = next_inputs;
-        current_outputs = next_outputs;
-        ++iterations;
-        for (const auto& [index, val] : blt::enumerate(current_inputs))
-        {
-            auto next = a1::run_step(weights, val, current_outputs[index]);
-            next_inputs[index] = next.first;
-            next_outputs[index] = next.second;
-        }
-        // loop until no changes or we hit the iteration limit
-    } while ((!a1::equal(current_inputs, next_inputs) || !a1::equal(current_outputs, next_outputs)) && iterations < max_iterations);
-    
-    BLT_DEBUG("Tracked after %ld iterations", iterations);
-    a1::check_recall(weights, next_inputs, next_outputs);
+//    auto current_inputs = input;
+//    auto current_outputs = output;
+//    auto next_inputs = current_inputs;
+//    auto next_outputs = current_outputs;
+//    blt::size_t iterations = 0;
+//    constexpr blt::size_t max_iterations = 5;
+//
+//    do
+//    {
+//        current_inputs = next_inputs;
+//        current_outputs = next_outputs;
+//        ++iterations;
+//        for (const auto& [index, val] : blt::enumerate(current_inputs))
+//        {
+//            auto next = a1::run_step(weights, val, current_outputs[index]);
+//            next_inputs[index] = next.first;
+//            next_outputs[index] = next.second;
+//        }
+//        // loop until no changes or we hit the iteration limit
+//    } while ((!a1::equal(current_inputs, next_inputs) || !a1::equal(current_outputs, next_outputs)) && iterations < max_iterations);
+//
+//    BLT_DEBUG("Tracked after %ld iterations", iterations);
+//    a1::check_recall(weights, next_inputs, next_outputs);
 }
 
 void part_a()
 {
     blt::log_box_t box(BLT_TRACE_STREAM, "Part A", 8);
     
-    execute_BAM(weight_total_a, part_a_inputs, part_a_outputs);
 }
 
 void part_b()

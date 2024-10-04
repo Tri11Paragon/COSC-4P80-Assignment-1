@@ -77,14 +77,14 @@ namespace a1
         return difference(a, b) == 0;
     }
     
-    template<typename weight_t, typename input_t, typename output_t>
-    std::pair<input_t, output_t> run_step(const weight_t& associated_weights, const input_t& input, const output_t& output)
-    {
-        output_t output_recall = input * associated_weights;
-        input_t input_recall = output_recall * associated_weights.transpose();
-        
-        return std::pair{a1::threshold(input_recall, input), a1::threshold(output_recall, output)};
-    }
+//    template<typename weight_t, typename input_t, typename output_t>
+//    std::pair<input_t, output_t> run_step(const weight_t& associated_weights, const input_t& input, const output_t& output)
+//    {
+//        output_t output_recall = input * associated_weights;
+//        input_t input_recall = output_recall * associated_weights.transpose();
+//
+//        return std::pair{a1::threshold(input_recall, input), a1::threshold(output_recall, output)};
+//    }
     
     template<typename weight_t, typename T, typename G>
     void check_recall(const weight_t& weights, const std::vector<G>& inputs, const std::vector<T>& outputs)
