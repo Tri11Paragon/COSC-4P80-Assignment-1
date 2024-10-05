@@ -29,8 +29,8 @@ class ping_pong
         
         [[nodiscard]] ping_pong run_step() const
         {
-            auto out = input * weights;
-            return {weights, threshold(out * weights.transpose()), threshold(out)};
+            auto out = (input * weights);
+            return {weights, (out * weights.transpose()).bipolar(), out.bipolar()};
         }
         
         [[nodiscard]] ping_pong pong() const
@@ -38,12 +38,12 @@ class ping_pong
             return run_step();
         }
         
-        input_t get_input()
+        [[nodiscard]] const input_t& get_input() const
         {
             return input;
         }
         
-        output_t get_output()
+        [[nodiscard]] const output_t& get_output() const
         {
             return output;
         }
@@ -57,18 +57,6 @@ class ping_pong
         {
             return a.input != b.input || a.output != b.output;
         }
-        
-        template<blt::u32 rows, blt::u32 columns>
-        static a1::matrix_t<rows, columns> threshold(const a1::matrix_t<rows, columns>& y)
-        {
-            a1::matrix_t<rows, columns> result;
-            for (blt::u32 i = 0; i < columns; i++)
-            {
-                for (blt::u32 j = 0; j < rows; j++)
-                    result[i][j] = y[i][j] >= 0 ? 1 : -1;
-            }
-            return result;
-        }
     
     private:
         weight_t weights;
@@ -79,9 +67,33 @@ class ping_pong
 class executor
 {
     public:
-        executor(weight_t weights, std::vector<input_t> inputs, std::vector<output_t> outputs):
-                weights(std::move(weights)), inputs(std::move(inputs)), outputs(std::move(outputs))
-        {}
+        executor(const std::vector<input_t>& inputs, const std::vector<output_t>& outputs): weights(), inputs(inputs), outputs(outputs)
+        {
+            for (auto [in, out] : blt::in_pairs(inputs, outputs))
+                weights += in.transpose() * out;
+        }
+        
+        std::vector<output_t> crosstalk()
+        {
+            std::vector<output_t> crosstalk_data;
+            crosstalk_data.resize(outputs.size());
+            
+            for (auto [i, c] : blt::enumerate(crosstalk_data))
+            {
+                for (auto [k, data] : blt::in_pairs(inputs, outputs).enumerate())
+                {
+                    if (i == k)
+                        continue;
+                    auto [a, b] = data;
+                    
+                    c += (b * (a.normalize() * inputs[i].normalize().transpose()));
+                }
+                
+                BLT_TRACE("Input %ld has crosstalk magnitude: %f || %f", i, c.magnitude());
+            }
+            
+            return crosstalk_data;
+        }
         
         void execute()
         {
@@ -102,91 +114,109 @@ class executor
             } while (steps.rbegin()[0] != steps.rbegin()[1]);
         }
         
-        void print_chains()
+        void print()
         {
             using namespace blt::logging;
-            std::vector<std::string> input;
-            input.reserve(inputs.size());
-            input.resize(inputs.size());
-            std::vector<std::string> output;
-            output.reserve(outputs.size());
-            output.resize(outputs.size());
-            for (auto [index, ref_pair] : blt::in_pairs(input, output).enumerate())
+            std::vector<std::string> input_lines;
+            std::vector<std::string> output_lines;
+            input_lines.resize(inputs.size());
+            output_lines.resize(outputs.size());
+            BLT_ASSERT(input_lines.size() == output_lines.size());
+            
+            for (auto [i, data] : blt::in_pairs(input_lines, output_lines).enumerate())
             {
-                auto& [i, o] = ref_pair;
-                (((i += "[Input  ") += std::to_string(index)) += "]: ") += ansi::RESET;
-                (((o += "[Output ") += std::to_string(index)) += "]: ") += ansi::RESET;
-                auto& current_line = steps[index];
-                for (auto [pos, ping] : blt::enumerate(current_line))
+                auto& [is, os] = data;
+                
+                auto ping_ping = steps.back()[i];
+                
+                auto& input_data = inputs[i];
+                auto& output_data = outputs[i];
+                
+                ((((is += input_data == ping_ping.get_input() ? ansi::make_color(ansi::GREEN) : ansi::make_color(
+                        ansi::RED)) += "[Input  ") += std::to_string(i)) += "]: ") += ansi::RESET;
+                ((((os += output_data == ping_ping.get_output() ? ansi::make_color(ansi::GREEN) : ansi::make_color(
+                        ansi::RED)) += "[Output ") += std::to_string(i)) += "]: ") += ansi::RESET;
+            }
+            
+            for (auto [step_index, step_data] : blt::enumerate(steps))
+            {
+                for (auto [data_index, current_data] : blt::enumerate(step_data))
                 {
-                    auto input_vec = ping.get_input().vec_from_column_row();
-                    auto output_vec = ping.get_output().vec_from_column_row();
-                    auto input_size = input_vec.end() - input_vec.begin();
-                    auto output_size = output_vec.end() - output_vec.begin();
-                    if (pos > 0)
+                    auto current_input = current_data.get_input().vec_from_column_row();
+                    auto current_output = current_data.get_output().vec_from_column_row();
+                    
+                    std::array<bool, decltype(current_input)::data_size> has_input_changed{};
+                    std::array<bool, decltype(current_output)::data_size> has_output_changed{};
+                    
+                    if (step_index > 0)
                     {
-                        ((i += "Vec") += blt::logging::to_string_stream(input_size)) += "(";
-                        ((o += "Vec") += blt::logging::to_string_stream(output_size)) += "(";
-                        auto prev_input_vec = current_line[pos - 1].get_input().vec_from_column_row();
-                        auto prev_output_vec = current_line[pos - 1].get_output().vec_from_column_row();
-                        for (auto [j, prev_value_t] : blt::zip(input_vec, prev_input_vec).enumerate())
-                        {
-                            auto [cur_input, prev_input] = prev_value_t;
-                            
-                            if (cur_input > 0)
-                                i += ' ';
-                            
-                            if (cur_input != prev_input)
-                                i += ansi::make_color(ansi::UNDERLINE);
-                            i += blt::logging::to_string_stream(cur_input);
-                            if (cur_input != prev_input)
-                                i += ansi::make_color(ansi::RESET_UNDERLINE);
-                            
-                            if (static_cast<blt::ptrdiff_t>(j) != input_size - 1)
-                                i += ", ";
-                        }
-                        for (auto [j, prev_value_t] : blt::zip(output_vec, prev_output_vec).enumerate())
-                        {
-                            auto [cur_output, prev_output] = prev_value_t;
-                            
-                            if (cur_output > 0)
-                                o += ' ';
-                            if (cur_output != prev_output)
-                                o += ansi::make_color(ansi::UNDERLINE);
-                            o += blt::logging::to_string_stream(cur_output);
-                            if (cur_output != prev_output)
-                                o += ansi::make_color(ansi::RESET_UNDERLINE);
-                            
-                            if (static_cast<blt::ptrdiff_t>(j) != output_size - 1)
-                                o += ", ";
-                        }
-                        i += ")";
-                        o += ")";
-                    } else
-                    {
-                        i += blt::logging::to_string_stream(input_vec);
-                        o += blt::logging::to_string_stream(output_vec);
+                        auto& previous_data = steps[step_index - 1][data_index];
+                        auto previous_input = previous_data.get_input().vec_from_column_row();
+                        auto previous_output = previous_data.get_output().vec_from_column_row();
+                        
+                        for (auto [vec_index, data] : blt::zip(current_input, previous_input).enumerate())
+                            has_input_changed[vec_index] = std::get<0>(data) != std::get<1>(data);
+                        for (auto [vec_index, data] : blt::zip(current_output, previous_output).enumerate())
+                            has_output_changed[vec_index] = std::get<0>(data) != std::get<1>(data);
                     }
                     
-                    auto diff_o = (static_cast<blt::ptrdiff_t>(input_size) - static_cast<blt::ptrdiff_t>(output_size)) * 4;
-                    auto diff_i = (static_cast<blt::ptrdiff_t>(output_size) - static_cast<blt::ptrdiff_t>(input_size)) * 4;
-                    for (blt::ptrdiff_t j = 0; j < diff_i; j++)
-                        i += ' ';
-                    for (blt::ptrdiff_t j = 0; j < diff_o; j++)
-                        o += ' ';
+                    auto& is = input_lines[data_index];
+                    auto& os = output_lines[data_index];
                     
-                    if (pos != current_line.size() - 1)
+                    ((is += "Vec") += blt::logging::to_string_stream(decltype(current_input)::data_size)) += "(";
+                    ((os += "Vec") += blt::logging::to_string_stream(decltype(current_output)::data_size)) += "(";
+                    
+                    is += a1::vec_formatter(current_input).format(has_input_changed);
+                    os += a1::vec_formatter(current_output).format(has_output_changed);
+                    
+                    is += ")";
+                    os += ")";
+                    
+                    auto diff_o = (static_cast<blt::i32>(decltype(current_input)::data_size)
+                                   - static_cast<blt::i32>(decltype(current_output)::data_size)) * 4;
+                    auto diff_i = (static_cast<blt::i32>(decltype(current_output)::data_size)
+                                   - static_cast<blt::i32>(decltype(current_input)::data_size)) * 4;
+                    for (blt::i32 j = 0; j < diff_i; j++)
+                        is += ' ';
+                    for (blt::i32 j = 0; j < diff_o; j++)
+                        os += ' ';
+                    
+                    if (step_index != steps.size() - 1)
                     {
-                        i += " => ";
-                        o += " => ";
+                        is += " => ";
+                        os += " => ";
+                    } else
+                    {
+                        is += " || ";
+                        os += " || ";
                     }
                 }
             }
             
-            for (auto [i, o] : blt::in_pairs(input, output))
+            for (auto [index, ping_ping] : blt::enumerate(steps.back()))
             {
-                BLT_TRACE_STREAM << i << "\n";
-                BLT_TRACE_STREAM << o << "\n";
+                auto& is = input_lines[index];
+                auto& os = output_lines[index];
+                
+                auto& input_data = inputs[index];
+                auto& output_data = outputs[index];
+                
+                if (input_data != ping_ping.get_input())
+                    ((is += ansi::make_color(ansi::RED)) += "[Failed]") += ansi::RESET;
+                else
+                    ((is += ansi::make_color(ansi::GREEN)) += "[Passed]") += ansi::RESET;
+                
+                if (output_data != ping_ping.get_output())
+                    ((os += ansi::make_color(ansi::RED)) += "[Failed]") += ansi::RESET;
+                else
+                    ((os += ansi::make_color(ansi::GREEN)) += "[Passed]") += ansi::RESET;
+            }
+            
+            BLT_TRACE("Changes between ping-pong steps are underlined.");
+            for (auto [is, os] : blt::in_pairs(input_lines, output_lines))
+            {
+                BLT_TRACE_STREAM << is << "\n";
+                BLT_TRACE_STREAM << os << "\n";
             }
         }
     
@@ -219,14 +249,6 @@ output_t output_5{1, 1, 1, 1};
 output_t output_6{1, -1, -1, 1};
 output_t output_7{1, 1, 1, -1};
 
-const weight_t weight_1 = input_1.transpose() * output_1;
-const weight_t weight_2 = input_2.transpose() * output_2;
-const weight_t weight_3 = input_3.transpose() * output_3;
-const weight_t weight_4 = input_4.transpose() * output_4;
-const weight_t weight_5 = input_5.transpose() * output_5;
-const weight_t weight_6 = input_6.transpose() * output_6;
-const weight_t weight_7 = input_7.transpose() * output_7;
-
 auto part_a_inputs = std::vector{input_1, input_2, input_3};
 auto part_a_outputs = std::vector{output_1, output_2, output_3};
 
@@ -236,47 +258,32 @@ auto part_c_1_outputs = std::vector{output_1, output_2, output_3, output_4};
 auto part_c_2_inputs = std::vector{input_1, input_2, input_3, input_4, input_5, input_6, input_7};
 auto part_c_2_outputs = std::vector{output_1, output_2, output_3, output_4, output_5, output_6, output_7};
 
-const auto weight_total_a = weight_1 + weight_2 + weight_3;
-const auto weight_total_c = weight_total_a + weight_4;
-const auto weight_total_c_2 = weight_total_c + weight_5 + weight_6 + weight_7;
-
-crosstalk_t crosstalk_values[num_values_part_a];
-
 void part_a()
 {
     blt::log_box_t box(BLT_TRACE_STREAM, "Part A", 8);
     
-    executor cute(weight_total_a, part_a_inputs, part_a_outputs);
+    executor cute(part_a_inputs, part_a_outputs);
     cute.execute();
-    cute.print_chains();
+    cute.print();
 }
 
 void part_b()
 {
     blt::log_box_t box(BLT_TRACE_STREAM, "Part B", 8);
-    for (blt::u32 i = 0; i < num_values_part_a; i++)
-    {
-        crosstalk_values[i] = {};
-        for (blt::u32 k = 0; k < num_values_part_a; k++)
-        {
-            if (i == k)
-                continue;
-            crosstalk_values[i] += (part_a_outputs[i] * a1::crosstalk(part_a_inputs[i].normalize(), part_a_inputs[k].normalize())).abs();
-        }
-    }
-    for (const auto& crosstalk_value : crosstalk_values)
-    {
-        auto vec = crosstalk_value.vec_from_column_row();
-        BLT_DEBUG_STREAM << vec << " Mag: " << vec.magnitude() << "\n";
-    }
+    executor cute(part_a_inputs, part_a_outputs);
+    cute.crosstalk();
 }
 
 void part_c()
 {
     blt::log_box_t box(BLT_TRACE_STREAM, "Part C", 8);
-//    execute_BAM(weight_total_c, part_c_1_inputs, part_c_1_outputs);
+    executor cute(part_c_1_inputs, part_c_1_outputs);
+    cute.execute();
+    cute.print();
     BLT_TRACE("--- { Part C with 3 extra pairs } ---");
-//    execute_BAM(weight_total_c_2, part_c_2_inputs, part_c_2_outputs);
+    executor cute2(part_c_2_inputs, part_c_2_outputs);
+    cute2.execute();
+    cute2.print();
 }
 
 int main()
@@ -287,4 +294,8 @@ int main()
     part_a();
     part_b();
     part_c();
+    
+    std::vector<input_t> test{input_t{1, -1, -1, -1, -1}, input_t{-1, 1, -1, -1, -1}, input_t{-1, -1, 1, -1, -1}};
+    executor cute{test, part_a_outputs};
+    cute.crosstalk();
 }

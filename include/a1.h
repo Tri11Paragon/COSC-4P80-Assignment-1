@@ -53,55 +53,40 @@ namespace a1
         BLT_ASSERT(g1 * g2.transpose() == blt::vec4::dot(one, two) && "MATH DOT FAILURE");
     }
     
-    template<typename input_t>
-    float crosstalk(const input_t& i, const input_t& j)
+    template<typename T, blt::u32 size>
+    struct vec_formatter
     {
-        return i * j.transpose();
-    }
+        public:
+            explicit vec_formatter(const blt::vec<T, size>& data): data(data)
+            {}
+            
+            template<typename Arr>
+            std::string format(const Arr& has_index_changed)
+            {
+                using namespace blt::logging;
+                std::string os;
+                for (auto [index, value] : blt::enumerate(data))
+                {
+                    if (value >= 0)
+                        os += ' ';
+                    if (has_index_changed[index])
+                        os += ansi::make_color(ansi::UNDERLINE);
+                    os += blt::logging::to_string_stream(value);
+                    if (has_index_changed[index])
+                        os += ansi::make_color(ansi::RESET_UNDERLINE);
+                    
+                    if (index != size - 1)
+                        os += ", ";
+                }
+                return os;
+            }
+        
+        private:
+            blt::vec<T, size> data;
+    };
     
-    template<typename T>
-    blt::size_t difference(const std::vector<T>& a, const std::vector<T>& b)
-    {
-        blt::size_t count = 0;
-        for (const auto& [a_val, b_val] : blt::in_pairs(a, b))
-        {
-            if (a_val != b_val)
-                count++;
-        }
-        return count;
-    }
-    
-    template<typename T>
-    bool equal(const std::vector<T>& a, const std::vector<T>& b)
-    {
-        return difference(a, b) == 0;
-    }
-    
-//    template<typename weight_t, typename input_t, typename output_t>
-//    std::pair<input_t, output_t> run_step(const weight_t& associated_weights, const input_t& input, const output_t& output)
-//    {
-//        output_t output_recall = input * associated_weights;
-//        input_t input_recall = output_recall * associated_weights.transpose();
-//
-//        return std::pair{a1::threshold(input_recall, input), a1::threshold(output_recall, output)};
-//    }
-    
-    template<typename weight_t, typename T, typename G>
-    void check_recall(const weight_t& weights, const std::vector<G>& inputs, const std::vector<T>& outputs)
-    {
-        for (const auto& [index, val] : blt::enumerate(inputs))
-        {
-            auto result = run_step(weights, val, outputs[index]);
-            if (result.first != val)
-                BLT_ERROR("Recall of input #%ld failed", index + 1);
-            else
-                BLT_INFO("Recall of input #%ld passed", index + 1);
-            if (result.second != outputs[index])
-                BLT_ERROR("Recall of output #%ld failed", index + 1);
-            else
-                BLT_INFO("recall of output #%ld passed", index + 1);
-        }
-    }
+    template<typename T, blt::u32 size>
+    vec_formatter(const blt::vec<T, size>& data) -> vec_formatter<T, size>;
 }
 
 #endif //COSC_4P80_ASSIGNMENT_1_A1_H
