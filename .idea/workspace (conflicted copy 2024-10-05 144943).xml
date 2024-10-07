@@ -25,7 +25,9 @@
     </configurations>
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="c26429cb-3f2d-4b3c-a3dd-031e70b9aeae" name="Changes" comment="" />
+    <list default="true" id="c26429cb-3f2d-4b3c-a3dd-031e70b9aeae" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/src/main.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/src/main.cpp" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -69,10 +71,16 @@
     &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
     &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
     &quot;settings.editor.selected.configurable&quot;: &quot;CPPToolchains&quot;,
+    &quot;structure.view.defaults.are.configured&quot;: &quot;true&quot;,
     &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
 }</component>
   <component name="RunManager" selected="CMake Application.COSC-4P80-Assignment-1">
+    <configuration default="true" type="CLionExternalRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true">
+      <method v="2">
+        <option name="CLION.EXTERNAL.BUILD" enabled="true" />
+      </method>
+    </configuration>
     <configuration name="BLT" type="CMakeRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true" PROJECT_NAME="COSC-4P80-Assignment-1" TARGET_NAME="BLT" CONFIG_NAME="Debug">
       <method v="2">
         <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
@@ -84,8 +92,8 @@
       </method>
     </configuration>
     <list>
-      <item itemvalue="CMake Application.BLT" />
       <item itemvalue="CMake Application.COSC-4P80-Assignment-1" />
+      <item itemvalue="CMake Application.BLT" />
     </list>
   </component>
   <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
@@ -100,7 +108,10 @@
       <workItem from="1727116071317" duration="39656000" />
       <workItem from="1727648722710" duration="1807000" />
       <workItem from="1727806367161" duration="2606000" />
-      <workItem from="1727974969818" duration="2000" />
+      <workItem from="1727823589121" duration="4802000" />
+      <workItem from="1728063301012" duration="9392000" />
+      <workItem from="1728077207859" duration="2250000" />
+      <workItem from="1728089514014" duration="3711000" />
     </task>
     <servers />
   </component>

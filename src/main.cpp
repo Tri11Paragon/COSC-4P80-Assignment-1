@@ -2,7 +2,8 @@
 #include <utility>
 #include <blt/math/matrix.h>
 #include <blt/math/log_util.h>
-#include "blt/std/assert.h"
+#include <blt/std/assert.h>
+#include <blt/std/random.h>
 #include <blt/format/boxing.h>
 #include <blt/iterator/iterator.h>
 #include <a1.h>
@@ -16,13 +17,20 @@ constexpr blt::u32 output_vec_size = 4;
 using input_t = a1::matrix_t<1, input_vec_size>;
 using output_t = a1::matrix_t<1, output_vec_size>;
 using weight_t = decltype(std::declval<input_t>().transpose() * std::declval<output_t>());
-using crosstalk_t = a1::matrix_t<1, output_vec_size>;
+
+struct correctness_t
+{
+    blt::size_t correct_input = 0;
+    blt::size_t correct_output = 0;
+    blt::size_t incorrect_input = 0;
+    blt::size_t incorrect_output = 0;
+};
 
 class ping_pong
 {
     public:
-        ping_pong(weight_t weights, input_t input): weights(std::move(weights)), input(std::move(input))
-        {}
+//        ping_pong(weight_t weights, input_t input): weights(std::move(weights)), input(std::move(input))
+//        {}
         
         ping_pong(weight_t weights, input_t input, output_t output): weights(std::move(weights)), input(std::move(input)), output(std::move(output))
         {}
@@ -31,6 +39,7 @@ class ping_pong
         {
             auto out = (input * weights);
             return {weights, (out * weights.transpose()).bipolar(), out.bipolar()};
+//            return {weights, (output * weights.transpose()).bipolar(), input * weights};
         }
         
         [[nodiscard]] ping_pong pong() const
@@ -69,11 +78,58 @@ class executor
     public:
         executor(const std::vector<input_t>& inputs, const std::vector<output_t>& outputs): weights(), inputs(inputs), outputs(outputs)
         {
+            generate_weights();
+        }
+        
+        void add_pattern(input_t input, output_t output)
+        {
+            inputs.push_back(std::move(input));
+            outputs.push_back(std::move(output));
+        }
+        
+        void generate_weights()
+        {
             for (auto [in, out] : blt::in_pairs(inputs, outputs))
                 weights += in.transpose() * out;
         }
         
-        std::vector<output_t> crosstalk()
+        void print_weights() const
+        {
+            BLT_TRACE_STREAM << "Weight Matrix: \n" << weights << "\n";
+        }
+        
+        void print_crosstalk_table()
+        {
+            using namespace blt::logging;
+            std::vector<std::string> lines;
+            lines.resize(inputs.size() + 2);
+            std::vector<output_t> crosstalk_data;
+            crosstalk_data.resize(outputs.size());
+            
+            for (auto [k, data] : blt::enumerate(inputs))
+                (lines[k] += "Input ") += std::to_string(k) += ": | ";
+            
+            for (auto [i, c] : blt::enumerate(crosstalk_data))
+            {
+                for (auto [k, data] : blt::in_pairs(inputs, outputs).enumerate())
+                {
+                    if (i == k)
+                        continue;
+                    auto [a, b] = data;
+                    
+                    (((lines[k] += "b=") += to_string_stream(b.vec_from_column_row()) += ",a=") += to_string_stream(
+                            a.normalize().vec_from_column_row()) += ",cos=") += to_string_stream(
+                            a.normalize() * inputs[i].normalize().transpose()) += " |";
+                    c += (b * (a.normalize() * inputs[i].normalize().transpose()));
+                }
+            }
+            
+            for (const auto& line : lines)
+                BLT_TRACE_STREAM << line << "\n";
+            
+        }
+        
+        [[nodiscard]] std::vector<output_t> crosstalk() const
         {
             std::vector<output_t> crosstalk_data;
             crosstalk_data.resize(outputs.size());
@@ -88,15 +144,29 @@ class executor
                     
                     c += (b * (a.normalize() * inputs[i].normalize().transpose()));
                 }
-                
-                BLT_TRACE("Input %ld has crosstalk magnitude: %f || %f", i, c.magnitude());
             }
             
             return crosstalk_data;
         }
         
+        void print_crosstalk() const
+        {
+            auto talk = crosstalk();
+            
+            float total_talk = 0;
+            
+            for (auto [i, c] : blt::enumerate(talk))
+            {
+                BLT_TRACE_STREAM << "Input " << i << " [" << inputs[i].vec_from_column_row() << "] has crosstalk magnitude: " << c.magnitude()
+                                 << "\n";
+                total_talk += c.magnitude();
+            }
+            BLT_TRACE("Total Crosstalk: %f", total_talk);
+        }
+        
         void execute()
         {
+            steps.clear();
             std::vector<ping_pong> initial_pings;
             initial_pings.reserve(inputs.size());
             for (auto [input, output] : blt::in_pairs(inputs, outputs))
@@ -114,7 +184,55 @@ class executor
             } while (steps.rbegin()[0] != steps.rbegin()[1]);
         }
         
-        void print()
+        void print_execution_summary()
+        {
+            using namespace blt::logging;
+            for (auto [i, data] : blt::zip(inputs, outputs, steps.back()).enumerate())
+            {
+                auto& [input_data, output_data, ping_ping] = data;
+                BLT_TRACE_STREAM << (input_data == ping_ping.get_input() ? ansi::make_color(ansi::GREEN) : ansi::make_color(ansi::RED))
+                                 << "[Input:  " << std::to_string(i) << "]: " << (input_data == ping_ping.get_input() ? "Passed" : "Failed") << "\n";
+                BLT_TRACE_STREAM << (output_data == ping_ping.get_output() ? ansi::make_color(ansi::GREEN) : ansi::make_color(ansi::RED))
+                                 << "[Output: " << std::to_string(i) << "]: " << (output_data == ping_ping.get_output() ? "Passed" : "Failed")
+                                 << "\n";
+            }
+        }
+        
+        [[nodiscard]] correctness_t correctness() const
+        {
+            correctness_t results;
+            for (auto [i, data] : blt::zip(inputs, outputs, steps.back()).enumerate())
+            {
+                auto& [input_data, output_data, ping_ping] = data;
+                
+                if (input_data == ping_ping.get_input())
+                    results.correct_input++;
+                else
+                    results.incorrect_input++;
+                
+                if (output_data == ping_ping.get_output())
+                    results.correct_output++;
+                else
+                    results.incorrect_output++;
+            }
+            return results;
+        }
+        
+        void print_correctness() const
+        {
+            auto data = correctness();
+            
+            BLT_TRACE("Correct inputs  %ld Incorrect inputs  %ld | (%lf%%)", data.correct_input, data.incorrect_input,
+                      static_cast<double>(data.correct_input * 100) / static_cast<double>(data.incorrect_input + data.correct_input));
+            BLT_TRACE("Correct outputs %ld Incorrect outputs %ld | (%lf%%)", data.correct_output, data.incorrect_output,
+                      static_cast<double>(data.correct_output * 100) / static_cast<double>(data.incorrect_output + data.correct_output));
+            BLT_TRACE("Total correct   %ld Total incorrect   %ld | (%lf%%)", data.correct_input + data.correct_output,
+                      data.incorrect_input + data.incorrect_output,
+                      static_cast<double>(data.correct_input + data.correct_output) * 100 /
+                      static_cast<double>(data.correct_input + data.correct_output + data.incorrect_input + data.incorrect_output));
+        }
+        
+        void print_execution_results()
         {
             using namespace blt::logging;
             std::vector<std::string> input_lines;
@@ -219,6 +337,16 @@ class executor
                 BLT_TRACE_STREAM << os << "\n";
             }
         }
+        
+        std::vector<ping_pong>& get_results()
+        {
+            return steps.back();
+        }
+        
+        std::vector<input_t>& get_inputs()
+        {
+            return inputs;
+        }
     
     private:
         weight_t weights;
@@ -264,14 +392,16 @@ void part_a()
     
     executor cute(part_a_inputs, part_a_outputs);
     cute.execute();
-    cute.print();
+    cute.print_execution_results();
+    cute.print_correctness();
 }
 
 void part_b()
 {
     blt::log_box_t box(BLT_TRACE_STREAM, "Part B", 8);
     executor cute(part_a_inputs, part_a_outputs);
-    cute.crosstalk();
+    cute.print_crosstalk();
+//    cute.print_crosstalk_table();
 }
 
 void part_c()
@@ -279,11 +409,58 @@ void part_c()
     blt::log_box_t box(BLT_TRACE_STREAM, "Part C", 8);
     executor cute(part_c_1_inputs, part_c_1_outputs);
     cute.execute();
-    cute.print();
+    cute.print_execution_results();
+    cute.print_correctness();
     BLT_TRACE("--- { Part C with 3 extra pairs } ---");
     executor cute2(part_c_2_inputs, part_c_2_outputs);
     cute2.execute();
-    cute2.print();
+    cute2.print_execution_results();
+    cute2.print_correctness();
+}
+
+blt::size_t hdist(const input_t& a, const input_t& b)
+{
+    blt::size_t diff = 0;
+    for (auto [av, bv] : blt::in_pairs(a.vec_from_column_row(), b.vec_from_column_row()))
+        diff += (av == bv ? 1 : 0);
+    return diff;
+}
+
+void part_d()
+{
+    blt::log_box_t box(BLT_TRACE_STREAM, "Part D", 8);
+    blt::random::random_t random(std::random_device{}());
+    blt::size_t number_of_runs = 20;
+    for (blt::size_t run = 0; run < number_of_runs; run++)
+    {
+        auto inputs = part_a_inputs;
+        
+        executor cute(part_a_inputs, part_a_outputs);
+        
+        auto pos = random.get_size_t(0, inputs.size());
+        auto& input = inputs[pos];
+        auto original = input;
+        for (blt::size_t i = 0; i < std::remove_reference_t<decltype(input)>::data_columns; i++)
+        {
+            if (random.choice(0.8))
+            {
+                // flip value of this location
+                auto& d = input[i][0];
+                if (d >= 0)
+                    d = -1;
+                else
+                    d = 1;
+            }
+        }
+        cute.get_inputs()[pos] = input;
+        cute.execute();
+        auto corrected = cute.get_results()[pos].get_input();
+        
+        auto dist_o_m = hdist(original, input);
+        auto dist_m_c = hdist(input, corrected);
+        
+        BLT_TRACE("Run %ld mutated difference: %ld corrected difference: %ld", run, dist_o_m, dist_m_c);
+    }
 }
 
 int main()
@@ -294,8 +471,9 @@ int main()
     part_a();
     part_b();
     part_c();
+    part_d();
     
     std::vector<input_t> test{input_t{1, -1, -1, -1, -1}, input_t{-1, 1, -1, -1, -1}, input_t{-1, -1, 1, -1, -1}};
     executor cute{test, part_a_outputs};
-    cute.crosstalk();
+    cute.print_crosstalk();
 }
