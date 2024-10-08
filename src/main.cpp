@@ -114,12 +114,13 @@ class executor
             std::vector<output_t> crosstalk_data;
             crosstalk_data.resize(outputs.size());
             
+            std::cout << "\\begin{tabular}{||c|c|c|c|c||}\n\\hline\n";
             for (auto [i, c] : blt::enumerate(crosstalk_data))
             {
                 if (print_latex)
                 {
                     if (i == 0)
-                        std::cout << "\\hline\nInput " << i + 1 << " &   & Cos & Output Vector & Crosstalk Vector \\\\\n\\hline\\hline\n";
+                        std::cout << "Input " << i + 1 << " &   & Cos & Output Vector & Crosstalk Vector \\\\\n\\hline\\hline\n";
                     else
                         std::cout << "Input " << i + 1 << " & & & & \\\\\n\\hline\\hline\n";
                 }
@@ -148,6 +149,7 @@ class executor
                     std::cout << "}\\\\\n\\multicolumn{5}{|c|}{Total Crosstalk: " << c.magnitude() << "} \\\\\n\\hline\\hline\n";
                 }
             }
+            std::cout << "\\end{tabular}\n";
             
             return crosstalk_data;
         }
@@ -273,12 +275,12 @@ class executor
             for (auto [i, os] : blt::enumerate(output_lines))
                 (os += "Output ") += std::to_string(i + 1);
             
-            for (const auto& step : steps)
+            for (const auto& [step_idx, step] : blt::enumerate(steps))
             {
                 for (auto [idx, pong] : blt::enumerate(step))
                 {
-                    if (!(idx == 0 || idx == step.size()-1))
-                        continue;
+                    if (!(step_idx == 0 || step_idx == steps.size()-1))
+                        break;
                     auto& is = input_lines[idx];
                     auto& os = output_lines[idx];
                     
@@ -579,12 +581,22 @@ void part_c()
     cute.print_crosstalk();
     if (print_latex)
         cute.print_execution_results_latex_no_intermediates();
+    cute.execute_output();
+    cute.print_execution_results();
+    cute.print_correctness();
+    if (print_latex)
+        cute.print_execution_results_latex_no_intermediates();
     BLT_TRACE("--- { Part C with 3 extra pairs } ---");
     executor cute2(part_c_2_inputs, part_c_2_outputs);
     cute2.execute_input();
     cute2.print_execution_results();
     cute2.print_correctness();
     cute2.print_crosstalk();
+    if (print_latex)
+        cute2.print_execution_results_latex_no_intermediates();
+    cute2.execute_output();
+    cute2.print_execution_results();
+    cute2.print_correctness();
     if (print_latex)
         cute2.print_execution_results_latex_no_intermediates();
 }
